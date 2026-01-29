@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>BUKHARIYA EDUCATIONAL CENTRE - Stock Details</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<style>
+body{
+  font-family:'Poppins',sans-serif;
+  background:#eef2f7;
+  margin:0;
+  padding:16px;
+}
+.container{max-width:900px;margin:auto}
+.header{text-align:center}
+.header h1{margin:0;font-size:26px;color:#0b3c5d}
+.header h2{margin:6px 0;color:#333}
+.time{font-size:13px;color:#555}
+
+.search{
+  display:flex;
+  gap:10px;
+  margin:20px 0;
+}
+.search input{
+  flex:1;
+  padding:12px;
+  font-size:16px;
+}
+.search button{
+  padding:12px 18px;
+  font-size:16px;
+  border:none;
+  border-radius:6px;
+  background:#0b5ed7;
+  color:#fff;
+}
+
+.card{
+  background:#fff;
+  border-radius:12px;
+  padding:18px;
+  box-shadow:0 8px 20px rgba(0,0,0,.1);
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  gap:12px;
+}
+.box{
+  background:#f7f9fc;
+  padding:10px;
+  border-radius:8px;
+  font-size:14px;
+}
+.box strong{display:block;color:#111}
+.low{background:#ffecec;color:#b71c1c}
+
+.actions{
+  margin-top:18px;
+  display:flex;
+  gap:10px;
+}
+.actions button{
+  flex:1;
+  padding:12px;
+  font-size:16px;
+  border:none;
+  border-radius:6px;
+}
+.pdf{background:#2e7d32;color:#fff}
+.new{background:#6c757d;color:#fff}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <div class="header">
+    <h1>BUKHARIYA EDUCATIONAL CENTRE</h1>
+    <h2>Burhan Stationery</h2>
+    <div class="time" id="time"></div>
+  </div>
+
+  <div class="search">
+    <input id="code" placeholder="Enter Item Code (Eg: F1)">
+    <button onclick="searchItem()">Search</button>
+  </div>
+
+  <div id="result"></div>
+</div>
+
+<script>
+const SHEET_URL =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vQqCfLpp-CK_qZ0rlDKT0SbUTL--j24S-S4bCTK33aCJDmkH1YVgoll_g8INDHJO0YOBvgcpaWsMcY_/pub?output=tsv";
+
+function updateTime(){
+  document.getElementById("time").innerText =
+    new Date().toLocaleString();
+}
+setInterval(updateTime,1000);
+updateTime();
+
+async function searchItem(){
+  const code = document.getElementById("code").value.trim().toUpperCase();
+  if(!code){alert("Enter Item Code");return;}
+
+  document.getElementById("result").innerHTML="Loading...";
+
+  const res = await fetch(SHEET_URL);
+  let text = await res.text();
+
+  // 🔥 REMOVE BOM
+  text = text.replace(/^\uFEFF/, "");
+
+  const rows = text.split(/\r?\n/)
+    .map(r => r.split("\t").map(c => c.trim()));
+
+  const header = rows[0].map(h => h.replace(/[^a-zA-Z ]/g,"").trim());
+
+  const col = name => header.findIndex(h => h.toLowerCase() === name.toLowerCase());
+
+  const idx = {
+    code: col("Item Code"),
+    name: col("Item Name"),
+    category: col("Category"),
+    unit: col("Unit"),
+    opening: col("Opening Stock"),
+    stockIn: col("Total Stock In"),
+    stockOut: col("Total Stock Out"),
+    current: col("Current Stock"),
+    purchase: col("Purchase Price"),
+    selling: col("Selling Price"),
+    value: col("Total Stock Value"),
+    reorder: col("Reorder Level"),
+    status: col("Status")
+  };
+
+  const row = rows.slice(1)
+    .find(r => r[idx.code]?.toUpperCase() === code);
+
+  if(!row){
+    alert("Item Code not found");
+    document.getElementById("result").innerHTML="";
+    return;
+  }
+
+  const fields = [
+    ["Item Code", idx.code],
+    ["Item Name", idx.name],
+    ["Category", idx.category],
+    ["Unit", idx.unit],
+    ["Opening Stock", idx.opening],
+    ["Total Stock In", idx.stockIn],
+    ["Total Stock Out", idx.stockOut],
+    ["Current Stock", idx.current],
+    ["Purchase Price", idx.purchase],
+    ["Selling Price", idx.selling],
+    ["Total Stock Value", idx.value],
+    ["Reorder Level", idx.reorder],
+    ["Status", idx.status]
+  ];
+
+  let html = `<div class="card" id="pdfArea"><div class="grid">`;
+
+  fields.forEach(f=>{
+    const v = row[f[1]] || "";
+    const cls = (f[0]==="Status" && /LOW/i.test(v)) ? "box low":"box";
+    html += `<div class="${cls}"><strong>${f[0]}</strong>${v}</div>`;
+  });
+
+  html += `</div>
+    <div class="actions">
+      <button class="pdf" onclick="downloadPDF()">Download PDF</button>
+      <button class="new" onclick="location.reload()">New Search</button>
+    </div></div>`;
+
+  document.getElementById("result").innerHTML = html;
+}
+
+function downloadPDF(){
+  html2pdf().from(document.getElementById("pdfArea"))
+    .save("Stock_Details.pdf");
+}
+</script>
+
+</body>
+</html>
